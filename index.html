@@ -17,41 +17,49 @@
   <div class="app-container">
     <!-- ID Section -->
     <div id="id" class="tab-layer active">
-        <div class="card">
+        <div class="card-wrapper">
+          <div class="card">
             <h2><i class="fa-solid fa-lock"></i> <label for="peerIdInput">Enter Connect Code</label></h2>
             <input type="text" id="peerIdInput" placeholder="XXXXXX" autocomplete="off">
             <button id="connectBtn" class="button-primary"><i class="fa-solid fa-arrow-right-to-bracket"></i> Connect</button>
+          </div>
         </div>
-        <div class="card">
-            <h2>Or Connect to this Device</h2>
-            <div id="qrcode" class="qrcode"></div>
-            <div class="my-id-wrapper">
-                <div id="my-id" class="peer-id">Loading...</div>
-                <button id="copyIdBtn" class="copy-btn"><i class="fa-solid fa-copy"></i></button>
-            </div>
+        <div class="card-wrapper">
+          <div class="card">
+              <h2>Or Connect to this Device</h2>
+              <div id="qrcode" class="qrcode"></div>
+              <div class="my-id-wrapper">
+                  <div id="my-id" class="peer-id">Loading...</div>
+                  <button id="copyIdBtn" class="copy-btn"><i class="fa-solid fa-copy"></i></button>
+              </div>
+          </div>
         </div>
     </div>
 
 
     <!-- Send section -->
-    <section class="card tab-layer" id="send">
-      <h2><i class="fa-solid fa-paper-plane"></i> Send Files</h2>
-      <div id="dropZone" class="drop-zone">
-        <i class="fa-regular fa-arrow-up-from-bracket"></i> Click or drag files here
+    <section class="card-wrapper tab-layer" id="send">
+      <div class="card">
+        <h2><i class="fa-solid fa-paper-plane"></i> Send Files</h2>
+        <div id="dropZone" class="drop-zone">
+          <i class="fa-regular fa-arrow-up-from-bracket"></i> Click or drag files here
+        </div>
+        <input type="file" id="fileInput" multiple />
+        <p id="fileCountStatus" class="status-small"></p>
+        <div id="queueList" class="queue-list"></div>
+        <button id="sendBtn" class="button-primary"><i class="fa-solid fa-share-from-square"></i> Send Files</button>
+        <div id="status" class="status-small">Waiting to send...</div>
+        <p class="status-small">All files are sent with end-to-end enscryption</p>
       </div>
-      <input type="file" id="fileInput" multiple />
-      <p id="fileCountStatus" class="status-small"></p>
-      <div id="queueList" class="queue-list"></div>
-      <button id="sendBtn" class="button-primary"><i class="fa-solid fa-share-from-square"></i> Send Files</button>
-      <div id="status" class="status-small">Waiting to send...</div>
-      <p class="status-small">All files are sent with end-to-end enscryption</p>
     </section>
 
     <!-- Receive section -->
-    <section class="card receive-section tab-layer" id="receive">
-      <h2><i class="fa-solid fa-inbox"></i> Received Files</h2>
-      <div id="receiveStatus" class="receive-status">Waiting for sender...</div>
-      <div id="receiveProgress" class="receive-progress"></div>
+    <section class="card-wrapper receive-section tab-layer" id="receive">
+      <div class="card">
+        <h2><i class="fa-solid fa-inbox"></i> Received Files</h2>
+        <div id="receiveStatus" class="receive-status">Waiting for sender...</div>
+        <div id="receiveProgress" class="receive-progress"></div>
+      </div>
     </section>
   </div>
 

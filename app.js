@@ -144,7 +144,11 @@ function addToQueue(file) {
 if (location.search.includes('id=')) {
   const id = new URLSearchParams(location.search).get('id');
   peerIdInput.value = id;
-  document.querySelector('#send-tab').click();
+  document.querySelector('#send-tab').classList.add('active');
+  document.querySelector('#id-tab').classList.remove('active');
+  document.querySelector('#send').classList.add('active');
+  document.querySelector('#id').classList.remove('active');
+
 }
 
 // Crypto helpers

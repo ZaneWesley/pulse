@@ -26,7 +26,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(0, 0, 0, 0.4);
+    background: #35363b;
     color: #ccc;
     padding: 0.7rem 1rem;
     font-size: 2rem;
@@ -74,8 +74,15 @@ body {
 }
 
 /* Cards */
+.card-wrapper {
+  position: relative;
+  height: auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
 .card {
-  background: rgba(244, 244, 245, 0.3);
+  background: #575b66;
   border-radius: 18px;
   padding: 2rem 2.5rem;
   width: 100%;
@@ -176,7 +183,7 @@ h2 i {
 #peerIdInput {
     border: none;
     outline: none;
-    background: rgba(0, 0, 0, 0.4);
+    background: #35363b;
     color: #ccc;
     padding: 0.7rem 1rem;
     font-size: 2rem;
@@ -309,8 +316,7 @@ h2 i {
     position: fixed;
     bottom: 2em;
     border-radius: 18px;
-    background-color: rgba(244, 244, 245, 0.3);
-    backdrop-filter: blur(2px);
+    background-color: #575b66;
     display: flex;
     cursor: pointer;
     user-select: none;
@@ -328,7 +334,7 @@ h2 i {
 }
 
 #tabs .tab.active {
-    background-color: rgba(0, 0, 0, 0.4);
+    background-color: #35363b;
 }
 
 .tab-layer {
@@ -336,8 +342,20 @@ h2 i {
 }
 
 .tab-layer.active {
-    display: block;
+    display: flex;
     animation: bubbleIn 0.3s ease forwards;
+}
+
+#id {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+#id .card {
+  width: calc(100vw - 4rem);
+  height: 90%;
+  max-width: 400px;
+  margin-right: 2rem;
+  scroll-snap-align: center;
 }
 
 /* Snackbar */
@@ -429,6 +447,10 @@ h2 i {
 @media (max-width: 720px) {
   .app-container {
     padding: 70px 1rem;
+  }
+  .card-wrapper {
+    height: 70vh;
+    justify-content: flex-start;
   }
   .drop-zone {
     padding: 2rem 1rem;
