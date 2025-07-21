@@ -201,7 +201,7 @@ peer.on('connection', incoming => {
         offset += chunk.byteLength;
       }
 
-      const downloadName = currentFile.name || 'unknown filename';
+      const downloadName = currentFile?.name || 'unknown filename';
 
       try {
         const decrypted = await decrypt(fullEncrypted.buffer, iv, sessionKey);
