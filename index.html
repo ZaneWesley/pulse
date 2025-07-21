@@ -2,34 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Pulse</title>
+  <title>Pulse File Transfer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="charset" content="utf-8" />
+  <meta name="description" content="Send. Sync. Secure. With Pulse." />
   <link rel="stylesheet" href="https://site-assets.fontawesome.com/releases/v6.7.2/css/all.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
   <!-- Main layout -->
   <div class="app-container">
     <!-- ID Section -->
-    <div id="id" class="tab-layer active">
+    <div id="id" class="tab-layer split-2 active">
         <div class="card-wrapper">
           <div class="card">
-            <h2><i class="fa-solid fa-lock"></i> <label for="peerIdInput">Enter Connect Code</label></h2>
+            <h2><i class="fa-solid fa-lock"></i> <label for="peerIdInput">Enter Pulse ID</label></h2>
             <input type="text" id="peerIdInput" placeholder="XXXXXX" autocomplete="off">
-            <button id="connectBtn" class="button-primary"><i class="fa-solid fa-arrow-right-to-bracket"></i> Connect</button>
+            <button id="connectBtn" class="button-primary"><i class="fa-solid fa-link"></i> Link Pulse</button>
           </div>
         </div>
         <div class="card-wrapper">
           <div class="card">
-              <h2>Or Connect to this Device</h2>
+              <h2>Or link to this Device</h2>
               <div id="qrcode" class="qrcode"></div>
               <div class="my-id-wrapper">
-                  <div id="my-id" class="peer-id">Loading...</div>
+                  <div id="my-id" class="peer-id" aria-label="this device's session pulse ID">Loading...</div>
                   <button id="copyIdBtn" class="copy-btn"><i class="fa-solid fa-copy"></i></button>
               </div>
           </div>
@@ -38,18 +40,27 @@
 
 
     <!-- Send section -->
-    <section class="card-wrapper tab-layer" id="send">
-      <div class="card">
-        <h2><i class="fa-solid fa-paper-plane"></i> Send Files</h2>
-        <div id="dropZone" class="drop-zone">
-          <i class="fa-regular fa-arrow-up-from-bracket"></i> Click or drag files here
+    <section class="tab-layer split-2" id="send">
+      <div class="card-wrapper">
+        <div class="card">
+          <h2><i class="fa-solid fa-paper-plane"></i> Transfer Files</h2>
+          <div id="dropZone" class="drop-zone">
+            <i class="fa-regular fa-arrow-up-from-bracket"></i> Click or drag files here
+          </div>
+          <input type="file" id="fileInput" multiple />
+          <p id="fileCountStatus" class="status-small"></p>
+          <div id="queueList" class="queue-list"></div>
+          <button id="sendBtn" class="button-primary"><i class="fa-solid fa-wave-pulse"></i> Sync Pulse</button>
+          <div id="status" class="status-small">Waiting for a pulse...</div>
+          <p class="status-small">All files are transfered with end-to-end enscryption</p>
         </div>
-        <input type="file" id="fileInput" multiple />
-        <p id="fileCountStatus" class="status-small"></p>
-        <div id="queueList" class="queue-list"></div>
-        <button id="sendBtn" class="button-primary"><i class="fa-solid fa-share-from-square"></i> Send Files</button>
-        <div id="status" class="status-small">Waiting to send...</div>
-        <p class="status-small">All files are sent with end-to-end enscryption</p>
+      </div>
+      <div class="card-wrapper" id="sent-queue">
+        <div class="card">
+          <h2><i class="fa-solid fa-inbox"></i> Pulse History</h2>
+          <div id="sentStatus" class="status-small">Waiting for pulse confirmation...</div>
+          <div id="sentFiles"></div>
+        </div>
       </div>
     </section>
 
@@ -57,15 +68,16 @@
     <section class="card-wrapper receive-section tab-layer" id="receive">
       <div class="card">
         <h2><i class="fa-solid fa-inbox"></i> Received Files</h2>
-        <div id="receiveStatus" class="receive-status">Waiting for sender...</div>
+        <div id="receiveStatus" class="receive-status">Waiting for a pulse...</div>
         <div id="receiveProgress" class="receive-progress"></div>
+        <div><button id="downloadAllBtn">Download All Files</button></div>
       </div>
     </section>
   </div>
 
   <div id="tabs">
-    <div id="id-tab" class="tab active">Connect</div>
-    <div id="send-tab" class="tab">Send</div>
+    <div id="id-tab" class="tab active">Pulse</div>
+    <div id="send-tab" class="tab">Transfer</div>
     <div id="receive-tab" class="tab">Receive</div>
   </div>
 

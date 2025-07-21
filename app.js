@@ -8,10 +8,12 @@ const peerIdInput = document.getElementById('peerIdInput');
 const sendBtn = document.getElementById('sendBtn');
 const myIdSpan = document.getElementById('my-id');
 const status = document.getElementById('status');
+const sentStatus = document.getElementById('sentStatus');
 const receiveStatus = document.getElementById('receiveStatus');
 const receiveProgress = document.getElementById('receiveProgress');
 const dropZone = document.getElementById('dropZone');
 const queueList = document.getElementById('queueList');
+const sentFiles = document.getElementById('sentFiles');
 const copyIdBtn = document.getElementById('copyIdBtn');
 const qrContainer = document.getElementById('qrcode');
 
@@ -47,10 +49,11 @@ function initPeer() {
 
   peer.on('error', (err) => {
     if (err.type === 'unavailable-id') {
-      console.warn(`ID ${customId} is taken, retrying...`);
+      console.warn(`Pulse ID ${customId} is taken, retrying...`);
       initPeer(); // Retry with new ID
     } else {
       console.error('Peer error:', err);
+      showSnackbar('error', `<i class="fa-solid fa-cloud-exclamation"></i> Pulse error: ${err.message}`);
     }
   });
 
@@ -64,7 +67,7 @@ copyIdBtn.onclick = () => {
         copyIdBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
         setTimeout(() => (copyIdBtn.innerHTML = '<i class="fa-solid fa-copy"></i>'), 2000);
     } catch (err) {
-        showSnackbar('error', `<i class="fa-solid fa-square-exclamation"></i> Failed to copy code`);
+        showSnackbar('error', `<i class="fa-solid fa-square-exclamation"></i> Failed to copy Pulse ID`);
     }
 };
 
@@ -121,8 +124,10 @@ function addToQueue(file) {
   item.className = 'queue-item enter'; // Add enter animation class
 
   item.innerHTML = `
+  <div>
     <span>${file.name}</span>
-    <button aria-label="Remove uploaded file ${file.name}"><i class="fa-regular fa-trash"></i></button>
+  </div>
+  <button aria-label="Remove uploaded file ${file.name}"><i class="fa-solid fa-trash"></i></button>
   `;
 
   const removeBtn = item.querySelector('button');
@@ -177,6 +182,11 @@ peer.on('connection', incoming => {
   let totalBytes = 0;
   let currentFileBox = null;
 
+  let receiveStartTime = 0;
+
+
+
+  // Upon receiving the file
   incoming.on('data', async data => {
     if (data.type === 'key') {
       sessionKey = await crypto.subtle.importKey("raw", data.key, "AES-GCM", false, ["decrypt"]);
@@ -191,22 +201,32 @@ peer.on('connection', incoming => {
         offset += chunk.byteLength;
       }
 
+      const downloadName = currentFile.name || 'unknown filename';
+
       try {
         const decrypted = await decrypt(fullEncrypted.buffer, iv, sessionKey);
         const blob = new Blob([decrypted], { type: currentFile.mime });
         const url = URL.createObjectURL(blob);
-        const downloadName = currentFile.name;
+
+        if (!window.receivedFilesZipQueue) window.receivedFilesZipQueue = [];
+        receivedFilesZipQueue.push({
+          name: downloadName,
+          blob: blob
+        });
 
         currentFileBox.querySelector('.preview-btn').onclick = () => window.open(url);
         currentFileBox.querySelector('.download-btn').onclick = () => downloadFile(url, downloadName);
 
 
-        receiveStatus.textContent = `Received: ${currentFile.name}`;
-        showSnackbar('success', `<i class="fa-solid fa-circle-check"></i> File received: ${currentFile.name}`);
+        receiveStatus.textContent = `Received: ${downloadName}`;
+        showSnackbar('success', `<i class="fa-solid fa-circle-check"></i> Pulse linked: ${downloadName}`);
+        incoming.send({ type: 'ack', status: 'success', name: downloadName });
 
       } catch (e) {
-        receiveStatus.textContent = `Failed to decrypt ${currentFile.name}`;
-        showSnackbar('error', `<i class="fa-solid fa-square-exclamation"></i> Failed to decrypt: ${currentFile.name}`);
+        receiveStatus.textContent = `Failed to link ${downloadName}`;
+        showSnackbar('error', `<i class="fa-solid fa-square-exclamation"></i> Failed to transfer: ${downloadName}`);
+        currentFileBox.querySelector('.progress-text').textContent = `Failed to link ${downloadName}`;
+        incoming.send({ type: 'ack', status: 'error', name: downloadName });
         console.error(e);
       }
 
@@ -225,28 +245,33 @@ peer.on('connection', incoming => {
         receivedBytes = 0;
         totalBytes = data.size;
         receiveStatus.textContent = `Receiving: ${currentFile.name}`;
+        receiveStartTime = Date.now(); // Start timing when file metadata is received
 
         currentFileBox = document.createElement('div');
         currentFileBox.className = 'preview-container enter';
 
         currentFileBox.innerHTML = `
-            <p><strong>${currentFile.name}</strong></p>
+            <p>${currentFile.name}</p>
             <small class="progress-text">Received 0 / ${formatBytes(totalBytes)}</small>
             <button class="button-primary preview-btn" disabled aria-label="Preview file"><i class="fa-light fa-eye"></i></button>
             <button class="button-primary download-btn" disabled aria-label="Download file"><i class="fa-regular fa-arrow-down-to-line"></i></button>
-            <button class="button-primary remove-btn" aria-label="Remove received file ${currentFile.name}"><i class="fa-regular fa-trash"></i></button>
+            <button class="button-primary remove-btn" aria-label="Remove received file ${currentFile.name}"><i class="fa-solid fa-trash"></i></button>
         `;
 
-        receiveProgress.appendChild(currentFileBox);
+        receiveProgress.prepend(currentFileBox);
         document.getElementById('receive-tab').click();
 
         currentFileBox.querySelector('.remove-btn').onclick = (e) => {
             currentFileBox = e.target.closest('.preview-container');
             currentFileBox.classList.add('exit');
-            receiveStatus.textContent = `Removing: ${currentFileBox.querySelector('p strong').textContent}`;
+            receiveStatus.textContent = `Removing: ${currentFileBox.querySelector('p').textContent}`;
             currentFileBox.addEventListener('animationend', () => {
                 if (currentFileBox.parentNode) currentFileBox.parentNode.removeChild(currentFileBox);
             }, { once: true });
+            // Remove from ZIP queue
+            if (window.receivedFilesZipQueue) {
+              window.receivedFilesZipQueue = receivedFilesZipQueue.filter(file => file.name !== currentFileBox.querySelector('p').textContent);
+            }
         };
 
         return;
@@ -261,22 +286,33 @@ peer.on('connection', incoming => {
       if (currentFileBox) {
         const progressText = currentFileBox.querySelector('.progress-text');
         const lastPreview = receiveProgress.lastElementChild;
-        if(lastPreview) {
-            const nameText = lastPreview.querySelector('p strong').parentNode; // the <p> containing the filename
-            const previewBtn = lastPreview.querySelector('.preview-btn');
-            const downloadBtn = lastPreview.querySelector('.download-btn');
+
+        // update preview buttons when transfer is complete
+        if(receivedBytes === totalBytes) {
+            const nameText = currentFileBox.querySelector('p').parentNode; // the <p> containing the filename
+            const previewBtn = currentFileBox.querySelector('.preview-btn');
+            const downloadBtn = currentFileBox.querySelector('.download-btn');
             if (nameText) {
-            nameText.style.color = (receivedBytes === totalBytes) ? '#fff' : '#b4b4b4';
+              nameText.style.color = (receivedBytes === totalBytes) ? '#fff' : '#b4b4b4';
             }
             if (previewBtn) {
-            previewBtn.disabled = (receivedBytes !== totalBytes);
+              previewBtn.disabled = (receivedBytes !== totalBytes);
             }
             if (downloadBtn) {
-            downloadBtn.disabled = (receivedBytes !== totalBytes);
+              downloadBtn.disabled = (receivedBytes !== totalBytes);
             }
+            progressText.innerHTML = `Pulse Linked`;
         }
-        if (progressText) {
-          progressText.textContent = `Received ${formatBytes(receivedBytes)} / ${formatBytes(totalBytes)}`;
+        if (progressText && !(receivedBytes === totalBytes)) {
+          const elapsed = (Date.now() - receiveStartTime) / 1000; // in seconds
+          const speed = receivedBytes / elapsed; // bytes per second
+          const remainingBytes = totalBytes - receivedBytes;
+          const timeRemaining = remainingBytes / speed;
+
+          const speedStr = speed > 1024 * 1024 ? `${(speed / (1024 * 1024)).toFixed(1)} MB/s` : `${(speed / 1024).toFixed(1)} KB/s`;
+          const etaStr = isFinite(timeRemaining) ? ` • ${formatETA(timeRemaining)} left` : '';
+
+          progressText.innerHTML = `Received: ${formatBytes(receivedBytes)} / ${formatBytes(totalBytes)}<br>${speedStr}${etaStr}`;
         }
       }
     }
@@ -284,7 +320,7 @@ peer.on('connection', incoming => {
 });
 
 peer.on('disconnected', () => {
-  showSnackbar('error','<i class="fa-solid fa-cloud-exclamation"></i> Disconnected from the other device. Attempting reconnect...');
+  showSnackbar('error','<i class="fa-solid fa-cloud-exclamation"></i> Pulse lost. Attempting reconnect...');
   peer.reconnect();
 });
 
@@ -293,10 +329,10 @@ peer.on('disconnected', () => {
 sendBtn.onclick = async () => {
   const files = [...droppedFiles];
   const targetId = peerIdInput.value.trim();
-  if (!files.length) return showSnackbar('error', '<i class="fa-solid fa-square-exclamation"></i> Add files to send');
-  if (!targetId) return showSnackbar('error', '<i class="fa-solid fa-triangle-exclamation"></i> Enter Connect Code');
+  if (!files.length) return showSnackbar('error', '<i class="fa-solid fa-square-exclamation"></i> Add files to transfer first!');
+  if (!targetId) return showSnackbar('error', '<i class="fa-solid fa-triangle-exclamation"></i> Enter Pulse ID to transfer files');
   if (targetId === peer.id) {
-    showSnackbar('error', '<i class="fa-solid fa-square-exclamation"></i> Cannot connect to yourself.');
+    showSnackbar('error', '<i class="fa-solid fa-square-exclamation"></i> Oops! You can\'t transfer to yourself');
     return;
   }
 
@@ -305,8 +341,59 @@ sendBtn.onclick = async () => {
 
   conn = peer.connect(targetId);
 
-    conn.on('error', (err) => showSnackbar('error','<i class="fa-solid fa-cloud-exclamation"></i> Connection error: ' + err));
-    conn.on('close', () => showSnackbar('error', '<i class="fa-solid fa-cloud-exclamation"></i> Connection closed unexpectedly'));
+    conn.on('error', (err) => showSnackbar('error','<i class="fa-solid fa-cloud-exclamation"></i> Pulse lost, encountered error: ' + err));
+    conn.on('close', () => showSnackbar('error', '<i class="fa-solid fa-cloud-exclamation"></i> Pulse lost unexpectedly'));
+
+    // Display the status of the transferred file when transfer is complete
+    conn.on('data', data => {
+      if (data && data.type === 'ack') {
+        const fileItem = [...queueList.children].find(item =>
+          item.querySelector('span')?.textContent === data.name
+        );
+
+        if (data.status === 'success') {
+          document.querySelector('#sent-queue').style.display = 'block';
+          document.querySelector('#sent-queue').classList.add('enter');
+          document.querySelector('#sent-queue').scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+          if (fileItem) {
+            // Animate removal from queue
+            fileItem.classList.add('exit');
+            fileItem.addEventListener('animationend', () => {
+              // Move to sentFiles
+              if (fileItem.parentNode) fileItem.parentNode.removeChild(fileItem);
+
+              const sentItem = document.createElement('div');
+              sentItem.className = 'sent-item enter';
+              sentItem.innerHTML = `
+                <span>${data.name}</span>
+                <small class="sent-status"><i class="fa-solid fa-circle-check"></i> Linked</small>
+              `;
+              sentFiles.prepend(sentItem);
+            }, { once: true });
+          }
+
+          showSnackbar('success', `<i class="fa-solid fa-circle-check"></i> ${data.name} received`);
+          status.innerHTML = '';
+          sentStatus.innerHTML = `Pulse detected!<br>You are safe to close this window.`;
+
+        } else {
+          if (fileItem) {
+            const errorTag = document.createElement('small');
+            errorTag.className = 'sent-status';
+            errorTag.style.color = '#F87171';
+            errorTag.style.display = 'block';
+            errorTag.innerHTML = '<i class="fa-solid fa-square-exclamation"></i> Failed';
+            fileItem.querySelector('div').append(errorTag);
+          }
+
+          showSnackbar('error', `<i class="fa-solid fa-square-exclamation"></i> Pulse lost: ${data.name}. Please try again.`);
+          status.innerHTML = `TRANSFER FAILED`;
+          sentStatus.textContent = `Pulse lost: ${data.name}. Please try again.`;
+        }
+      }
+
+    });
+
 
   conn.on('open', () => {
     conn.send({ type: 'key', key: new Uint8Array(rawKey) });
@@ -321,7 +408,7 @@ sendBtn.onclick = async () => {
       conn.send({ type: 'meta', name: file.name, size: encrypted.byteLength, mime: file.type, iv: [...iv] });
       status.textContent = `Sending: ${file.name}`;
 
-      const chunkSize = 16 * 1024;
+      const chunkSize = 512 * 1024; // Chunk size = 512kb (512 * 1024 bytes), max at 1024kb/1mb
       let sentBytes = 0;
 
       // Create a subtle progress text under each file in queue
@@ -331,10 +418,13 @@ sendBtn.onclick = async () => {
         const progText = document.createElement('small');
         progText.className = 'progress-text';
         progText.textContent = `Sent 0 / ${formatBytes(encrypted.byteLength)}`;
-        thisFileItem.appendChild(progText);
+        thisFileItem.querySelector('div').appendChild(progText);
       }
 
+      const ETAstartTime = Date.now(); // Start time for ETA
+
       for (let offset = 0; offset < encrypted.byteLength; offset += chunkSize) {
+
         conn.send(encrypted.slice(offset, offset + chunkSize));
         sentBytes += Math.min(chunkSize, encrypted.byteLength - offset);
 
@@ -342,12 +432,22 @@ sendBtn.onclick = async () => {
         if (thisFileItem) {
           const progText = thisFileItem.querySelector('.progress-text');
           if (progText) {
-            progText.textContent = `Sent ${formatBytes(sentBytes)} / ${formatBytes(encrypted.byteLength)}`;
+            const elapsed = (Date.now() - ETAstartTime) / 1000; // seconds
+            const speed = sentBytes / elapsed; // bytes per second
+            const remaining = encrypted.byteLength - sentBytes;
+            const eta = speed > 0 ? (remaining / speed).toFixed(1) : '?';
+            progText.innerHTML = `Sent ${formatBytes(sentBytes)} / ${formatBytes(encrypted.byteLength)}<br>Time Remaining: ${formatETA(eta)}`;
           }
         }
 
         // Wait a tiny bit to avoid flooding
-        await new Promise(r => setTimeout(r, 5));
+        //await new Promise(r => setTimeout(r, 5));
+        // Dynamic pacing based on channel buffer size
+        const maxBuffer = 1 * 1024 * 1024; // 1MB
+        while (conn.bufferSize > maxBuffer) {
+          const waitTime = Math.min(50, Math.floor(conn.bufferSize / 20480)); // 0–50ms
+          await new Promise(r => setTimeout(r, waitTime));
+        }
       }
 
       conn.send('EOF');
@@ -355,10 +455,11 @@ sendBtn.onclick = async () => {
       if (++index < files.length) {
         setTimeout(() => sendFile(files[index]), 300);
       } else {
-        status.textContent = `All files sent!`;
-        showSnackbar('success', '<i class="fa-solid fa-circle-check"></i> All files sent!');
+        status.innerHTML = `All files transfered! Waiting for a pulse confirmation...<br>Please don\'t close this window.`;
+        sentStatus.innerHTML = `All files transfered! Waiting for a pulse confirmation...<br>Please don\'t close this window.`;
+        showSnackbar('success', '<i class="fa-solid fa-circle-check"></i> All files transfered! Waiting for a pulse confirmation... Please don\'t close this window.');
         droppedFiles = [];
-        queueList.innerHTML = '';
+        //queueList.innerHTML = '';
         updateFileCountStatus();
       }
     };
@@ -377,6 +478,15 @@ function formatBytes(bytes, decimals = 1) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+// Helper to format ETA seconds as minutes and seconds
+const formatETA = (seconds) => {
+  seconds = parseFloat(seconds);
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return `${mins}m ${secs}s`;
+};
+
 // Download helper
 window.downloadFile = (url, name) => {
   const a = document.createElement('a');
@@ -384,6 +494,29 @@ window.downloadFile = (url, name) => {
   a.download = name;
   a.click();
 };
+
+document.getElementById('downloadAllBtn').addEventListener('click', async () => {
+  if (!window.receivedFilesZipQueue || receivedFilesZipQueue.length === 0) {
+    showSnackbar('error', '<i class="fa-regular fa-folder-open"></i> No pulses detected');
+    return;
+  }
+
+  const zip = new JSZip();
+
+  for (const file of receivedFilesZipQueue) {
+    zip.file(file.name, file.blob);
+  }
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(content);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'pulse-files-download.zip';
+  a.click();
+  URL.revokeObjectURL(url);
+  showSnackbar('success', '<i class="fa-solid fa-circle-check"></i> Files downloaded!');
+});
+
 
 // Tab Management
 
@@ -397,7 +530,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 document.getElementById('connectBtn').onclick = () => {
-    if(!peerIdInput.value.trim()) return showSnackbar('error', '<i class="fa-solid fa-triangle-exclamation"></i> Enter Connect Code');
+    if(!peerIdInput.value.trim()) return showSnackbar('error', '<i class="fa-solid fa-triangle-exclamation"></i> Enter Pulse ID');
     document.getElementById('send-tab').click();
 }
 
